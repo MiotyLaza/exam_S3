@@ -1,0 +1,153 @@
+PROJET: systeme de gestion de dons pour les sinistres (V2)
+
+OBJECTIFS:
+- distribuer les dons selon les besoins des villes
+- suivre les besoins, le stock et l'historique
+- utiliser les dons en argent pour acheter des produits (nature/materiaux)
+- afficher un recapitulatif global en montant
+
+PAGES:
+1) page distribution
+2) page achat
+3) tableau de bord
+4) page recapitulatif (actualisation Ajax)
+
+BDD (tables necessaires):
+
+table ville (
+    id_ville PK,
+    nom_ville UNIQUE
+)
+
+table type_don (
+    id_type PK,
+    nom_type -- nature, materiaux, argent
+)
+
+table sous_type_don (
+    id_sous_type PK,
+    id_type FK -> type_don.id_type,
+    nom_sous_type UNIQUE -- riz, huile, clou, tole, bois, argent
+    unite_defaut -- kg, litre, metre, arriary
+)
+
+table besoin (
+    id_besoin PK,
+    id_ville FK -> ville.id_ville,
+    id_sous_type FK -> sous_type_don.id_sous_type,
+    quantite_requise,
+    quantite_restante,
+    unite,
+    date_besoin,
+    statut -- ouvert, partiel, satisfait
+)
+
+table stock (
+    id_stock PK,
+    id_sous_type FK -> sous_type_don.id_sous_type,
+    quantite_disponible,
+    unite
+)
+
+table distribution (
+    id_distribution PK,
+    id_besoin FK -> besoin.id_besoin,
+    id_sous_type FK -> sous_type_don.id_sous_type,
+    quantite_distribuee,
+    unite,
+    date_distribution
+)
+
+table mouvement_stock (
+    id_mouvement PK,
+    type_mouvement -- ENTREE_DON / SORTIE_DISTRIBUTION / ENTREE_ACHAT / SORTIE_ARGENT_ACHAT
+    id_sous_type FK -> sous_type_don.id_sous_type,
+    quantite,
+    unite,
+    date_mouvement,
+    reference_table, -- don / distribution / achat
+    reference_id
+)
+
+table prix (
+    id_prix PK,
+    id_sous_type FK -> sous_type_don.id_sous_type,
+    prix_unitaire, -- arriary par unite
+    date_prix
+)
+
+table achat (
+    id_achat PK,
+    id_ville FK -> ville.id_ville,
+    id_sous_type FK -> sous_type_don.id_sous_type, -- seulement nature/materiaux
+    quantite_achetee,
+    prix_unitaire,
+    montant_total,
+    date_achat
+)
+
+REGLES METIER V2:
+- un achat n'est possible que si le stock argent est suffisant
+- montant_total = quantite_achetee * prix_unitaire
+- apres achat:
+  - diminuer le stock argent (sous_type = argent)
+  - augmenter le stock du sous_type achete
+  - enregistrer les mouvements dans mouvement_stock
+- une distribution ne peut pas depasser:
+  - le besoin restant
+  - le stock disponible
+
+PAGE DISTRIBUTION:
+- menu ville sinistree
+- menu type
+- menu sous_type
+- champ quantite a distribuer
+- unite auto selon sous_type
+- bouton valider distribution
+
+PAGE ACHAT:
+- menu ville sinistree
+- menu type (nature, materiaux)
+- menu sous_type (riz, huile, clou, tole, bois)
+- champ quantite a acheter
+- prix unitaire auto (depuis table prix)
+- montant total auto (quantite * prix)
+- affichage du solde argent disponible
+- bouton valider achat
+
+TABLEAU DE BORD:
+- liste des villes
+- besoins par ville (ouvert/partiel/satisfait)
+- besoins par categorie (nature/materiaux/argent)
+- historique des distributions par ville
+- montant total des achats par ville
+
+PAGE RECAPITULATIF (AJAX):
+- besoins totaux en montant
+- besoins satisfaits en montant
+- dons recus en montant
+- dons distribues en montant
+- achats effectues en montant
+- solde argent restant
+- bouton "Actualiser" en Ajax
+
+REGLES METIER V3:
+- quand on envoie un don a une ville, et que cette ville n'en a pas besoin genre on envoie de l'huile a une ville qui n en a pas besoin alors , on peut faire une vente locale du produit et si la ville a besoin d'argent alors cet argent sera envoye automatiquement a la ville en question dans le cas contraire elle sera aditionne a l argent de l entreprise
+
+conditions de vente locale:
+- la vente est autorisee uniquement si ce sous-type n'apparait dans aucun besoin ouvert d'aucune ville
+- la quantite vendue ne doit pas depasser le stock disponible
+- le prix de vente unitaire doit etre  -10% du prix unitaire d'achat (taux parametrable)
+- montant_vente = quantite_vendue * prix_vente_unitaire
+
+gestion de l'argent de la vente:
+- si la ville a un besoin ouvert en argent:
+- l'argent de la vente est d'abord affecte a ce besoin (diminution du besoin restant)
+- le surplus eventuel est ajoute au stock argent global
+- sinon:
+- tout le montant de la vente est ajoute au stock argent global
+
+controles bloquants:
+- vente refusee si un besoin ouvert existe pour ce sous-type
+- vente refusee si stock insuffisant
+- vente refusee si prix de vente > plafond autorise
